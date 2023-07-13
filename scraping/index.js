@@ -1,20 +1,15 @@
 const axios = require('axios');
-const { Client } = require('pg');
+const postgres = require('postgres');
+require('dotenv').config();
 
-const dbConfig = {
-    user: 'postgres',
-    host: 'localhost',
-    database: 'earthquake_data',
-    password: 'password',
-    port: 5432,
-};
+const { PGHOST, PGDATABASE, PGUSER, PGPASSWORD, ENDPOINT_ID } = process.env;
+const URL = `postgres://${PGUSER}:${PGPASSWORD}@${PGHOST}/${PGDATABASE}?options=project%3D${ENDPOINT_ID}`;
+
+const sql = postgres(URL, { ssl: 'require' });
 
 const apiUrl = 'https://data.bmkg.go.id/DataMKG/TEWS/gempadirasakan.json';
 
 async function insertEarthquakeData(earthquakeData) {
-    const client = new Client(dbConfig);
-    await client.connect();
-
     try {
         for (const earthquake of earthquakeData) {
             const { DateTime, Wilayah, Magnitude, Lintang, Bujur } = earthquake;
@@ -30,23 +25,22 @@ async function insertEarthquakeData(earthquakeData) {
 
             if (isNaN(longitude)) {
                 console.error('Invalid longitude value:', Bujur);
-                continue; 
+                continue;
             }
 
-            const query = {
-                text: 'INSERT INTO earthquakes (datetime, region, magnitude, latitude, longitude) VALUES ($1, $2, $3, $4, $5)',
-                values: [DateTime, Wilayah, Magnitude, latitude, longitude],
-            };
-            await client.query(query);
+            const query = sql`
+                INSERT INTO earthquakes (datetime, region, magnitude, latitude, longitude)
+                VALUES (${DateTime}, ${Wilayah}, ${Magnitude}, ${latitude}, ${longitude})
+            `;
+            await query;
         }
         console.log('Earthquake data inserted successfully.');
     } catch (error) {
         console.error('Error inserting earthquake data:', error);
         throw error;
-    } finally {
-        await client.end();
     }
 }
+
 async function scrapeEarthquakeData() {
     try {
         const response = await axios.get(apiUrl);
