@@ -41,7 +41,7 @@ app.get('/earthquakes', async (req, res) => {
   }
 })
 
-const port = 5002
+const port = process.env.PORT || 5002;
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`)
