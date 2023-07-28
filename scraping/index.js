@@ -9,22 +9,39 @@ const sql = postgres(URL, { ssl: 'require' });
 
 const apiUrl = 'https://data.bmkg.go.id/DataMKG/TEWS/gempadirasakan.json';
 
+async function checkIfEarthquakeDataExists(earthquake) {
+    const { DateTime, Magnitude, Coordinates } = earthquake;
+    const latitude = parseFloat(Coordinates.split(' ')[0]);
+    const longitude = parseFloat(Coordinates.split(',')[1]);
+
+    const query = sql`
+        SELECT id FROM earthquakes
+        WHERE datetime = ${DateTime}
+        AND magnitude = ${Magnitude}
+        AND latitude = ${latitude}
+        AND longitude = ${longitude}
+        LIMIT 1
+    `;
+
+    const result = await query;
+    return result.length > 0;
+}
+
 async function insertEarthquakeData(earthquakeData) {
     try {
         for (const earthquake of earthquakeData) {
-            const { DateTime, Wilayah, Magnitude, Lintang, Bujur } = earthquake;
-
-            const latitude = parseFloat(Lintang.split(' ')[0]);
-
-            if (isNaN(latitude)) {
-                console.error('Invalid latitude value:', Lintang);
+            const dataExists = await checkIfEarthquakeDataExists(earthquake);
+            if (dataExists) {
+                console.log('Data already exists, skipping insertion:', earthquake);
                 continue;
             }
 
-            const longitude = parseFloat(Bujur.split(' ')[0]);
+            const { DateTime, Wilayah, Magnitude, Coordinates } = earthquake;
+            const latitude = parseFloat(Coordinates.split(' ')[0]);
+            const longitude = parseFloat(Coordinates.split(',')[1]);
 
-            if (isNaN(longitude)) {
-                console.error('Invalid longitude value:', Bujur);
+            if (isNaN(latitude) || isNaN(longitude)) {
+                console.error('Invalid latitude or longitude value:', earthquake);
                 continue;
             }
 
